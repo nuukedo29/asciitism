@@ -82,6 +82,15 @@ def tokenize_java(code):
 				replacement_offset += len(replacement_token) - (match.span()[1] - match.span()[0])
 		return string
 
+	def tokenize_strings(string):
+		replacement_offset = 0
+		for match in re.finditer(rb"('[^']*'|\"[^\"]*\")", string):
+			replacement_token = b"+".join([bytes([match.groups()[0][0]]) + bytes([char]) + bytes([match.groups()[0][0]]) for char in match.groups()[0][1:-1]]) 
+			string = string[:match.span()[0]+replacement_offset] + replacement_token + string[match.span()[1]+replacement_offset:]
+			replacement_offset += len(replacement_token) - (match.span()[1] - match.span()[0])
+		return string
+
+	code = tokenize_strings(code)
 	code = subn_but_careful(rb"(?m)//(.*?)$", b"/*\g<1>*/", code)
 	code = subn_but_careful(rb"(\|\||\+\+|\-\-|\=\=\=|\=\=|[\!\*\+\-\/\<\>]\=|[\*\+\-\/\=]|[\{\}\[\]\;\(\)\<\>\%\!\,\?\:])", b" \g<1> ", code)
 	code = subn_but_careful(rb"('.*?'|\".*?\")", b" \g<1> ", code)
@@ -120,14 +129,14 @@ for y in range(0, height-1):
 		distance_left = width - 1 - x 
 
 		if tokens and token_size >= width-1: # if its bigger - then fuck it
-			output.write(token)
+			output.write(token + b" ")
 			token_offset += 1
-			skip_rows += token_size
+			skip_rows += token_size + 1
 
 		elif tokens and distance_left >= token_size and color_distance(pixel_lookahead(image, x, y, token_size), token) < token_size*150: # if code looks kinda like the image
-			output.write(token)
+			output.write(token + b" ")
 			token_offset += 1
-			skip_rows += token_size
+			skip_rows += token_size + 1
 
 		# elif distance_left > 20:
 		# 	output.write(b"/*")
