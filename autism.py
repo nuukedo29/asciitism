@@ -85,7 +85,7 @@ def tokenize_java(code):
 	def tokenize_strings(string):
 		replacement_offset = 0
 		for match in re.finditer(rb"('[^']*'|\"[^\"]*\")", string):
-			replacement_token = b"+".join([bytes([match.groups()[0][0]]) + bytes([char]) + bytes([match.groups()[0][0]]) for char in match.groups()[0][1:-1]]) 
+			replacement_token = b"+".join([bytes([match.groups()[0][0]]) + char.encode("utf8") + bytes([match.groups()[0][0]]) for char in re.findall(r"(\\.|.)", match.groups()[0][1:-1].decode("utf8"))] or [b"\"\""]) 
 			string = string[:match.span()[0]+replacement_offset] + replacement_token + string[match.span()[1]+replacement_offset:]
 			replacement_offset += len(replacement_token) - (match.span()[1] - match.span()[0])
 		return string
