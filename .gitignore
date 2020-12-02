@@ -1,3 +1,4 @@
-*.java
-*.png
-*.txt
+*
+!.gitignore
+!*.py
+!*.md
