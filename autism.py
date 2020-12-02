@@ -8,25 +8,32 @@ import sys
 width, height = 88, 88
 
 COLORS = [
+	# r" ",
+	# r"\.",
+	# r"[\'\`]",
+	# r"\"",
+	# r"\:",
+	# r";",
+	# r"\!",
+	# r"\|",
+	# r"[\?]",
+	# r"[\-\+\_]",
+	# r"[a-z0-9]",
+	# r"[A-Z]",
+	# r"#",
+	# r"\@"
 	r" ",
-	r"\.",
-	r"[\'\`]",
-	r"\"",
-	r"\:",
-	r";",
-	r"\!",
-	r"\|",
-	r"[\?]",
-	r"[\-\+\_]",
+	r"[\.\,]",
+	r"[\'\"]",
+	r"\:\;",
 	r"[a-z0-9]",
 	r"[A-Z]",
-	r"#",
-	r"\@"
+	r"[\@\#]"
 ]
 
-code = open("code.txt", "r", encoding="utf8").read()
+code = open("Ch4Practice.java", "rb").read()
 
-image = PIL.Image.open(sys.argv[1])
+image = PIL.Image.open("Untitled.png")
 image.load()
 image.thumbnail((width, height), PIL.Image.ANTIALIAS)
 image = PIL.ImageOps.grayscale(image)
@@ -45,24 +52,94 @@ def color_to_pattern(color):
 		if _color == color:
 			return pattern
 
-output = open("output.txt", "w", encoding="utf8")
-code_offset = 0
+def tokenize_java(code):
 
-print(width, height)
+	def lookup_strings(code):
+		positions = []
+		for match in re.finditer(rb"('[^']*'|\"[^\"]*\")", code):
+			positions.append([match.span()[0], match.span()[1]])
+		return positions
 
-for y in range(0, height-1, 2):
+	def lookup_comments(code):
+		positions = []
+		for match in re.finditer(rb"(?sm)(\/\*.*?\*\/)", code):
+			positions.append([match.span()[0], match.span()[1]])
+		return positions
+
+	def is_position_illegal(start_pos, end_pos, positions):
+		for [_start_pos, _end_pos] in positions:
+			if set(range(_start_pos, _end_pos)).intersection(range(start_pos, end_pos)):
+				return True
+		return False
+
+	def subn_but_careful(pattern, replacement, string):
+		replacement_offset = 0
+		for match in re.finditer(pattern, string):
+			positions = [*lookup_strings(string), *lookup_comments(string)]
+			if not is_position_illegal(match.span()[0]+replacement_offset, match.span()[1]+replacement_offset, positions):
+				replacement_token = replacement.replace(b"\g<1>", (match.groups() or [b""])[0])
+				string = string[:match.span()[0]+replacement_offset] + replacement_token + string[match.span()[1]+replacement_offset:]
+				replacement_offset += len(replacement_token) - (match.span()[1] - match.span()[0])
+		return string
+
+	code = subn_but_careful(rb"(?m)//(.*?)$", b"/*\g<1>*/", code)
+	code = subn_but_careful(rb"(\|\||\+\+|\-\-|\=\=\=|\=\=|[\!\*\+\-\/\<\>]\=|[\*\+\-\/\=]|[\{\}\[\]\;\(\)\<\>\%\!\,\?\:])", b" \g<1> ", code)
+	code = subn_but_careful(rb"('.*?'|\".*?\")", b" \g<1> ", code)
+	code = subn_but_careful(rb"\s+", b" ", code)
+	return re.findall(rb"[^\s]+", code)
+
+output = open("output.txt", "wb")
+
+tokens = tokenize_java(code)
+token_offset = 0
+
+def pixel_lookahead(image, x, y, distance):
+	buffer = []
+	for n in range(0,distance):
+		buffer.append(image.getpixel((x+n, y)))
+	return buffer
+
+def color_distance(buffer1, buffer2):
+	total = 0
+	for n in range(0,len(buffer1)):
+		total += abs(buffer1[n] - buffer2[n])
+	return total
+
+image.save("gay.png")
+
+for y in range(0, height-1):
+	skip_rows = 0
 	for x in range(0, width-1):
-		pixel = image.getpixel((x, y))
-		# char = code[code_offset]
-		# char_color = ascii_to_color(char)
+		if skip_rows:
+			skip_rows -= 1
+			continue
 
-		# print(color_to_pattern(pixel))
+		token = None if token_offset+1 > len(tokens) else tokens[token_offset]
+		token_size = len(token) if token else 0
 
-		output.write(exrex.getone(color_to_pattern(pixel)))
-		# if pixel == char_color:
-		# 	output.write(char)
-		# 	code_offset += 1
-		# else: 
-		# 	output.write(" ")
+		distance_left = width - 1 - x 
+
+		if tokens and token_size >= width-1: # if its bigger - then fuck it
+			output.write(token)
+			token_offset += 1
+			skip_rows += token_size
+
+		elif tokens and distance_left >= token_size and color_distance(pixel_lookahead(image, x, y, token_size), token) < token_size*150: # if code looks kinda like the image
+			output.write(token)
+			token_offset += 1
+			skip_rows += token_size
+
+		# elif distance_left > 20:
+		# 	output.write(b"/*")
+		# 	for pixel in pixel_lookahead(image, x, y, distance_left)[2:-2]:
+		# 		output.write(exrex.getone(color_to_pattern(pixel)).encode("utf8"))
+		# 	output.write(b"*/")
+		# 	skip_rows += distance_left
 			
-	output.write("\n")
+		else:
+			output.write(b" ")
+			# skip_rows += distance_left
+
+	output.write(b"\n")
+
+output.write(b" ".join(tokens[token_offset:]))
