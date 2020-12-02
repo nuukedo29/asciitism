@@ -1,0 +1,6 @@
+# ASCIITISM
+AUTISM + ASCII art 
+
+## Why?
+
+YES
